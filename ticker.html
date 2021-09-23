@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<head>
+	<title>Weather</title>
+		
+	<meta description="Weather"/>
+	<meta publisher="bclee" />
+
+	Location
+	<input type="text" id="location" label="Coordinates (x.xxx, y.yyy)" value="40.7664737,-73.9760511"> <br>
+</head>
+
+<body style="margin: 0; padding: 0;">
+	<canvas id="weatherCanvas" width="320" height="200"></canvas>
+</body>
+
+
+<script>
+	console.clear();
+	var api_key = "ABiLQbmIKnsh36WNn3zLiSJV7C3xjOL8";
+	var weather_condition;
+
+	function fetchLocationKey() {
+		var coord = document.getElementById("location").value;
+		var loctranskey_url = 'http://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=' + api_key + '&q=' + coord;
+		var loctranskey_response = getHTML(loctranskey_url, "location");
+	}
+
+	function locationKeyParse(response) {
+		var loc_key = JSON.parse(response).Key;
+
+		var weather_url = 'http://dataservice.accuweather.com/currentconditions/v1/'+ loc_key +'?apikey=' + api_key + '&details=true';
+		var weather_response = getHTML(weather_url, "weather");
+	}
+
+	function weatherParse(response) {
+		var weather_condition = JSON.parse(response)[0].WeatherText;
+		alert(weather_condition);
+	}
+
+	function getHTML(url, step) {
+		var request_url = url;
+		var MyRequest = new XMLHttpRequest(); // a new request
+		MyRequest.open("GET", request_url, true);
+		MyRequest.onload = function (e) {
+			if (MyRequest.readyState === 4) {
+				if (MyRequest.status === 200) {
+					console.log("Success!")
+					if (step == "location") {
+						locationKeyParse(MyRequest.responseText);
+					} else if (step == "weather") {
+						weatherParse(MyRequest.responseText);
+					}
+				} else {
+					console.error(MyRequest.statusText);
+				}
+			}
+		};
+		MyRequest.onerror = function (e) {
+			console.error(MyRequest.statusText);
+		};
+		MyRequest.send(null);
+
+		return;
+	}
+
+	var c = document.getElementById("weatherCanvas");
+	var ctx = c.getContext("2d");
+	var width = 320;
+	var height = 200;
+	var start = 0;
+
+	function snowEffect() {
+		var c = document.getElementById("weatherCanvas");
+		var ctx = c.getContext("2d");
+		var h = c.height;
+		var w = c.width;
+		//ctx.strokeStyle = 'rgba(174,194,224,0.5)';
+		ctx.strokeStyle = 'rgba(0,0,255,0.75)';
+		ctx.lineWidth = 10;
+		ctx.lineCap = 'round';	
+		//ctx.fillStyle = "black";
+		
+		var init = [];
+		var maxParts = 100; // 100 light drizzle 1000 heavy snow
+		for(var a = 0; a < maxParts; a++) {
+			init.push({
+				x: Math.random() * w,
+				y: Math.random() * h,
+				l: Math.random() * 1,
+				xs: -4 + Math.random() * 4 + 2,
+				ys: Math.random() * 10 + 10
+			})
+		}
+		
+		var particles = [];
+		for(var b = 0; b < maxParts; b++) {
+			particles[b] = init[b];
+		}
+		
+		function draw() {
+			ctx.clearRect(0, 0, w, h);
+			for(var c = 0; c < particles.length; c++) {
+				var p = particles[c];
+				ctx.beginPath();
+				ctx.moveTo(p.x, p.y);
+				ctx.lineTo(p.x + p.l * p.xs, p.y + p.l * p.ys);
+				ctx.stroke();
+			}
+			move();
+		}
+		
+		function move() {
+			for(var b = 0; b < particles.length; b++) {
+				var p = particles[b];
+				p.x += p.xs;
+				p.y += p.ys;
+				if(p.x > w || p.y > h) {
+					p.x = Math.random() * w;
+					p.y = -20;
+				}
+			}
+		}
+		setInterval(draw, 30);
+
+	}
+
+	//fetchLocationKey();
+	ctx.fillStyle = "blue";
+	ctx.fillRect(0, 0, c.width, c.height);
+	snowEffect();
+
+	// setInterval(function(){
+	
+	// 	start += 4;
+		
+	// 	ctx.fillStyle = "blue";
+	// 	ctx.fillRect(0, 0, c.width, c.height);
+		
+	// 	ctx.fillStyle = "white";
+	// 	ctx.font = "50px Impact";
+	// 	ctx.fillText("75\xB0F", start, 200);
+		
+	// 	}, 40);
+
+</script>
