@@ -1,40 +1,108 @@
 <!DOCTYPE html>
 <head>
-	<title>Weather</title>
+	<title>Weather Light Script</title>
 		
 	<meta description="Weather"/>
 	<meta publisher="bclee" />
 
 	Location
-	<input type="text" id="location" label="Coordinates (x.xxx, y.yyy)" value="40.7664737,-73.9760511"> <br>
+	<input type="text" id="location" label="Coordinates (x.xxx, y.yyy)" value="40.7664737,-73.9760511" onchange="fetchLocationKey();"> <br>
+
+	API Key
+	<input type="text" id="api" label="API Key" value="ABiLQbmIKnsh36WNn3zLiSJV7C3xjOL8"> <br>
+
+	Manual Override
+	<select id="selectWeather" onchange="animate=false;loadWeatherScript(this.value);">
+		<option value=""></option>
+		<option value="Sunny">Sunny</option>
+		<option value="Cloudy">Cloudy</option>
+		<option value="Rain">Rain</option>
+		<option value="Snow">Snow</option>
+		<option value="Light Snow">Light Snow</option>
+		<option value="Wet Snow">Wet Snow</option>
+	</select>
+
 </head>
 
 <body style="margin: 0; padding: 0;">
 	<canvas id="weatherCanvas" width="320" height="200"></canvas>
 </body>
 
-
 <script>
 	console.clear();
-	var api_key = "ABiLQbmIKnsh36WNn3zLiSJV7C3xjOL8";
-	var weather_condition;
+	var api_key = document.getElementById('api').value;
+	var weatherCondition, raw_weatherCondition;
+	var isDayTime;
+
+	conditionTranslate = {
+		"Sunny" : "Sunny",
+		"Mostly Sunny" : "Sunny",
+		"Partly Sunny" : "Sunny",
+		"Intermittent Clouds" : "Cloudy",
+		"Hazy Sunshine" : "Cloudy",
+		"Mostly Cloudy" : "Cloudy",
+		"Cloudy" : "Cloudy",
+		"Dreary (Overcast)" : "Cloudy",
+		"Fog" : "Cloudy",
+		"Showers" : "Rain",
+		"Mostly Cloudy w/ Showers" : "Rain",
+		"Partly Sunny w/ Showers" : "Rain",
+		"T-Storms" : "Rain",
+		"Mostly Cloudy w/ T-Storms" : "Rain",
+		"Partly Sunny w/ T-Storms" : "Rain",
+		"Rain" : "Rain",
+		"Flurries" : "Light Snow",
+		"Mostly Cloudy w/ Flurries" : "Light Snow",
+		"Partly Sunny w/ Flurries" : "Light Snow",
+		"Snow" : "Snow",
+		"Mostly Cloudy w/ Snow" : "Snow",
+		"Ice" : "Wet Snow",
+		"Sleet" : "Wet Snow",
+		"Freezing Rain" : "Wet Snow",
+		"Rain and Snow" : "Wet Snow",
+		"Hot" : "Sunny",
+		"Cold" : "Sunny",
+		"Windy" : "Cloudy", // gonna need additional light script
+		"Clear" : "Sunny",
+		"Mostly Clear" : "Sunny",
+		"Partly Cloudy" : "Cloudy",
+		"Intermittent Clouds" : "Cloudy",
+		"Hazy Moonlight" : "Cloudy",
+		"Mostly Cloudy" : "Cloudy",
+		"Partly Cloudy w/ Showers" : "Rain",
+		"Mostly Cloudy w/ Showers" : "Rain",
+		"Partly Cloudy w/ T-Storms" : "Rain",
+		"Mostly Cloudy w/ T-Storms" : "Rain",
+		"Mostly Cloudy w/ Flurries" : "Light Snow",
+		"Mostly Cloudy w/ Snow": "Light Snow"
+	}
 
 	function fetchLocationKey() {
 		var coord = document.getElementById("location").value;
+		coord = coord.replace(/ /g, '');
+
 		var loctranskey_url = 'http://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=' + api_key + '&q=' + coord;
 		var loctranskey_response = getHTML(loctranskey_url, "location");
 	}
 
 	function locationKeyParse(response) {
 		var loc_key = JSON.parse(response).Key;
-
+		console.log("Location Key: " + loc_key);
 		var weather_url = 'http://dataservice.accuweather.com/currentconditions/v1/'+ loc_key +'?apikey=' + api_key + '&details=true';
 		var weather_response = getHTML(weather_url, "weather");
 	}
 
 	function weatherParse(response) {
-		var weather_condition = JSON.parse(response)[0].WeatherText;
-		alert(weather_condition);
+		raw_weatherCondition = JSON.parse(response)[0].WeatherText;
+
+		this.isDayTime = JSON.parse(response)[0].IsDayTime;
+		console.log("Daytime?: "+this.isDayTime);
+		console.log("Weather is: "+raw_weatherCondition);
+
+		weatherCondition = conditionTranslate[raw_weatherCondition];
+		raw_weatherCondition = raw_weatherCondition.toLowerCase();
+
+		loadWeatherScript(weatherCondition);		
 	}
 
 	function getHTML(url, step) {
@@ -44,7 +112,7 @@
 		MyRequest.onload = function (e) {
 			if (MyRequest.readyState === 4) {
 				if (MyRequest.status === 200) {
-					console.log("Success!")
+					console.log("Success!");
 					if (step == "location") {
 						locationKeyParse(MyRequest.responseText);
 					} else if (step == "weather") {
@@ -59,7 +127,6 @@
 			console.error(MyRequest.statusText);
 		};
 		MyRequest.send(null);
-
 		return;
 	}
 
@@ -67,25 +134,20 @@
 	var ctx = c.getContext("2d");
 	var width = 320;
 	var height = 200;
-	var start = 0;
+	var animate = true;
 
-	function snowEffect() {
-		var c = document.getElementById("weatherCanvas");
-		var ctx = c.getContext("2d");
-		var h = c.height;
-		var w = c.width;
-		//ctx.strokeStyle = 'rgba(174,194,224,0.5)';
-		ctx.strokeStyle = 'rgba(0,0,255,0.75)';
-		ctx.lineWidth = 10;
+	function precipitationEffect(precipColor, precipSize, precipPartCount, precipSpeed, bgColor) {
+
+		ctx.strokeStyle = precipColor;
+		ctx.lineWidth = precipSize; // 10
 		ctx.lineCap = 'round';	
-		//ctx.fillStyle = "black";
 		
 		var init = [];
-		var maxParts = 100; // 100 light drizzle 1000 heavy snow
+		var maxParts = precipPartCount; // 100 light drizzle 1000 heavy snow
 		for(var a = 0; a < maxParts; a++) {
 			init.push({
-				x: Math.random() * w,
-				y: Math.random() * h,
+				x: Math.random() * width,
+				y: Math.random() * height,
 				l: Math.random() * 1,
 				xs: -4 + Math.random() * 4 + 2,
 				ys: Math.random() * 10 + 10
@@ -96,11 +158,14 @@
 		for(var b = 0; b < maxParts; b++) {
 			particles[b] = init[b];
 		}
-		
+
 		function draw() {
-			ctx.clearRect(0, 0, w, h);
+			ctx.clearRect(0, 0, width, height);
+			ctx.fillStyle = bgColor;
+			ctx.fillRect(0, 0, width, height);
 			for(var c = 0; c < particles.length; c++) {
 				var p = particles[c];
+				
 				ctx.beginPath();
 				ctx.moveTo(p.x, p.y);
 				ctx.lineTo(p.x + p.l * p.xs, p.y + p.l * p.ys);
@@ -114,32 +179,127 @@
 				var p = particles[b];
 				p.x += p.xs;
 				p.y += p.ys;
-				if(p.x > w || p.y > h) {
-					p.x = Math.random() * w;
+				if(p.x > width || p.y > height) {
+					p.x = Math.random() * width;
 					p.y = -20;
 				}
 			}
 		}
-		setInterval(draw, 30);
 
+		setInterval(draw, precipSpeed); // 20 fast // 60 slow
 	}
 
-	//fetchLocationKey();
-	ctx.fillStyle = "blue";
-	ctx.fillRect(0, 0, c.width, c.height);
-	snowEffect();
+	function cloudyEffect() {
+			
+		let time = 0;
 
-	// setInterval(function(){
-	
-	// 	start += 4;
+		const color = function (x, y, r, g, b) {
+			ctx.fillStyle = 'rgb('+r+','+g+','+b+')';
+			ctx.fillRect(x, y, width, height);
+		}
+		const RGB = function (x, y, time) {
+			return (Math.floor(192 + 64 * Math.cos((x * x - y * y) / 300 + time)));
+		}
+
+		const startAnimation = function () {
+			for (x = 0; x <= 1; x++) {
+				for (y = 0; y <= 1; y++) {
+					let colorValue = RGB(x, y, time)
+					color(x, y, colorValue, colorValue, colorValue); // # All 3 the same for gray
+				}
+			}
+
+			time = time + 0.01;
+			window.requestAnimationFrame(startAnimation);
+		}
+
+		startAnimation();
+	}
+
+	function clearSkyEffect() {
+
+		const hours = new Date().getHours()
+		let isDayTime;
+
+		if (this.isDayTime !== null) {
+			console.log("Using Coordinate Local Time")
+			isDayTime = this.isDayTime;
+		} else {
+			console.log("Using User's System Local Time");
+			isDayTime = hours > 6 && hours < 20
+		}
 		
-	// 	ctx.fillStyle = "blue";
-	// 	ctx.fillRect(0, 0, c.width, c.height);
-		
-	// 	ctx.fillStyle = "white";
-	// 	ctx.font = "50px Impact";
-	// 	ctx.fillText("75\xB0F", start, 200);
-		
-	// 	}, 40);
+		if (isDayTime) { // Day
+			var radSubtract = 90;
+			var hue = 60; // yellow
+
+			function draw() {
+				ctx.clearRect(0, 0, width, height)
+				ctx.beginPath();
+				var initRadius = width > height ? height/2 : width/2;
+				var radius = initRadius - 20;
+				ctx.fillStyle = "#83CBEF"; //day
+				ctx.fillRect(0, 0, width, height);
+				while (radius > 0) {
+					ctx.beginPath();
+					ctx.arc(width/2, height/2, radius, 0, 2*Math.PI);
+					ctx.fillStyle = 'hsla(' + hue + ', 100%, 60%, ' + 1.5*(initRadius - radius)/initRadius + ')' 
+					ctx.fill();
+					radius -= radSubtract;
+				}
+			}
+
+			var angle = 0;
+			function update() { // Radial Pulsing Effect
+				angle += 2*Math.PI / 625;
+				radSubtract = Math.cos(angle) * 110 + 112;
+			}
+
+			let requestId;
+			function loop() {
+				requestAnimationFrame(loop);
+				update();
+				draw();
+			}
+			loop();
+
+		} else { // Night
+			ctx.clearRect(0, 0, width, height);
+			ctx.fillStyle = "A9A9A9";
+			ctx.fillRect(0, 0, width, height);
+			ctx.beginPath();
+			
+			ctx.arc(width/2, height/2, 50, 0, 2 * Math.PI);
+			ctx.lineWidth = 20;
+			ctx.fillStyle = "white";
+			ctx.fill();
+			ctx.strokeStyle = "gray";
+			ctx.stroke();
+		}
+	}
+
+	var manualWeather = document.getElementById("selectWeather").value;
+	if (manualWeather != null || manualWeather == "") {
+		fetchLocationKey();
+	}
+
+	function loadWeatherScript(weatherCondition) {
+
+		if (weatherCondition == "Sunny" || raw_weatherCondition.includes("sun") || raw_weatherCondition.includes("clear")) {
+			clearSkyEffect(); // Will change to moon if it is nighttime
+		} else if (weatherCondition == "Rain" || raw_weatherCondition.includes("rain") || raw_weatherCondition.includes("storm") || raw_weatherCondition.includes("drizzle")) {
+			precipitationEffect('rgba(100,100,255,1)', 5, 200, 30, "#99CCFF");
+		} else if (weatherCondition == "Light Snow") {
+			precipitationEffect('rgba(255,255,255,1)', 10, 10, 50, "gray");
+		} else if (weatherCondition == "Wet Snow") {
+			precipitationEffect('rgba(100,255,255,1)', 10, 10, 50, "gray");
+		} else if (weatherCondition == "Snow" || raw_weatherCondition.includes("snow")) {
+			precipitationEffect('rgba(255,255,255,1)', 10, 50, 60, "gray");
+		} else if (weatherCondition == "Cloudy" || raw_weatherCondition.includes("cloud") || raw_weatherCondition.includes("haz") || raw_weatherCondition.includes("fog")) {
+			cloudyEffect();
+		} else {
+			console.log("Well damn. Congratulations, you found a new weather phenomenon! " + weatherCondition);
+		}
+	}
 
 </script>
